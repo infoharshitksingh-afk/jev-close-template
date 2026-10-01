@@ -1,0 +1,90 @@
+# Copy to config.yaml, or run `python jevclose.py setup` to fill it in interactively.
+# Never put passwords here: use ${ENV_VAR} in database URLs and set the variable in your shell.
+
+company_name: TypeSafe AI
+reporting_timezone: America/Los_Angeles   # days and hours are cut in this zone
+as_of_month: auto                         # or YYYY-MM; `run --as-of` overrides
+
+sources:
+  # REQUIRED. Raw API call logs (one row per call) or a daily rollup.
+  usage:
+    type: file                            # file | sql
+    path: /path/to/api_logs/*.jsonl.gz    # glob of CSV / JSON Lines / Parquet
+    grain: call                           # call | daily
+    columns:                              # standard field: your column name
+      ts: created_at
+      account_id: org_id
+      status: status_code
+      input_tokens: usage_input_tokens    # the BILLED tokens the API returns, not request length
+      request_id: x_typesafe_request_id
+      channel: source
+      model: model
+      project_label: project
+      questions: n_questions
+      max_choice_cardinality: max_cardinality
+      latency_ms: latency_ms
+  # Example of a database source instead of files:
+  #   type: sql
+  #   url: ${WAREHOUSE_URL}               # e.g. postgresql+psycopg://user@host/db, snowflake://..., bigquery://...
+  #   query: SELECT * FROM analytics.api_calls WHERE created_at >= '2026-09-01'
+
+  # REQUIRED. One row per account.
+  accounts:
+    type: sql
+    url: ${APP_DB_URL}
+    query: SELECT id AS account_id, name, created_at, plan, source FROM orgs
+    columns: {account_id: account_id, display_name: name, signup_date: created_at, segment: plan, channel: source}
+
+  # OPTIONAL sources: set skip: true if you don't have one yet.
+  contracts:          {skip: true}
+  pipeline:           {skip: true}
+  billing_ledger:     {skip: true}
+  gateway_statements: {skip: true}
+  hourly:             {skip: true}      # only needed when usage is a daily rollup
+  label_map:
+    type: file
+    path: reference/label_map.csv
+    columns: {project_label: project_label, use_case: use_case}
+
+billing:
+  billable_statuses: [200]              # which HTTP statuses are billed
+  prices:                               # list price history, $ per million input tokens
+    - {effective_from: 2026-09-15, price_per_mtok: 0.042}
+  free_credit_usd: 5.0                  # default grant for new accounts (an accounts.free_credit_usd column overrides)
+  free_credit_channels: [direct]        # channels whose new accounts get the default grant
+  prorate_partial_months: true          # prorate commitments in a contract's first and last month
+
+gateways:                               # resellers; channel names must match the usage/accounts data
+  vercel:       {fee_pct: 0.05, passes_customer_ids: true}
+  openrouter:   {fee_pct: 0.05, passes_customer_ids: false}
+  digitalocean: {fee_pct: 0.08, passes_customer_ids: true}
+gateway_revenue_treatment: net          # net = gateway is the customer; gross = fee booked as a cost
+
+checks:
+  billed_tokens_tolerance_pct: 0.0005
+  gateway_tolerance_pct: 0.005
+  remittance_tolerance_usd: 0.02
+  price_tolerance_per_mtok: 1.0e-9
+  concentration_threshold: 0.5          # top-3 share of revenue that triggers an INFO
+  unclassified_threshold: 0.2           # share of tokens with no use case that triggers an INFO
+
+use_case:
+  offhours_end_hour: 6                  # calls before this local hour count as overnight
+
+forecast:                               # seeds the blue cells on the Forecast tab
+  tail_factor: {low: 0.93, base: 0.97, high: 1.0}
+  gateway_growth_decay: 0.5
+  ent_usage_ratio: {low: 0.8, base: 1.0, high: 1.2}
+  ent_growth: {low: 0.0, base: 0.03, high: 0.06}
+  ent_ramp_days: 60
+
+capacity:                               # seeds the blue cells on the Capacity tab
+  gpu_tokens_per_sec: 20604             # replace with measured serving throughput
+  peak_utilization: 0.85
+  reserved_rate: 2.50
+  on_demand_rate: 3.00
+  peak_ratio_override: 1.75             # only used when there is no hourly data
+  base_ratio_override: 0.55
+
+outputs:
+  dir: outputs                          # contains customer data: keep it out of git

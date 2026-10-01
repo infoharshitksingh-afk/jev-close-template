@@ -1,0 +1,70 @@
+{
+ "tail_factor.low": [
+  "Forecast",
+  "B6"
+ ],
+ "tail_factor.base": [
+  "Forecast",
+  "C6"
+ ],
+ "tail_factor.high": [
+  "Forecast",
+  "D6"
+ ],
+ "gateway_growth_decay": [
+  "Forecast",
+  "C10"
+ ],
+ "ent_usage_ratio.low": [
+  "Forecast",
+  "B11"
+ ],
+ "ent_usage_ratio.base": [
+  "Forecast",
+  "C11"
+ ],
+ "ent_usage_ratio.high": [
+  "Forecast",
+  "D11"
+ ],
+ "ent_growth.low": [
+  "Forecast",
+  "B12"
+ ],
+ "ent_growth.base": [
+  "Forecast",
+  "C12"
+ ],
+ "ent_growth.high": [
+  "Forecast",
+  "D12"
+ ],
+ "ent_ramp_days": [
+  "Forecast",
+  "C13"
+ ],
+ "capacity.gpu_tokens_per_sec": [
+  "Capacity",
+  "B6"
+ ],
+ "capacity.peak_utilization": [
+  "Capacity",
+  "B7"
+ ],
+ "capacity.reserved_rate": [
+  "Capacity",
+  "B8"
+ ],
+ "capacity.on_demand_rate": [
+  "Capacity",
+  "B9"
+ ],
+ "capacity.peak_ratio_override": [
+  "Capacity",
+  "B10"
+ ],
+ "capacity.base_ratio_override": [
+  "Capacity",
+  "B11"
+ ]
+}

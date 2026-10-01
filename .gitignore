@@ -1,0 +1,12 @@
+# Outputs contain customer names and revenue: never commit them
+outputs/*
+!outputs/.gitkeep
+examples/outputs/
+examples/data/
+tests/outputs*/
+tests/*.sqlite
+config.yaml
+*.duckdb
+__pycache__/
+*.pyc
+.DS_Store

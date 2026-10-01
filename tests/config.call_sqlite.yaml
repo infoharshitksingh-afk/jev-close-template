@@ -1,0 +1,25 @@
+# Test: call-level raw logs from files + accounts from a SQL database (SQLite here; same code path as Postgres/Snowflake).
+company_name: Test (call-level + SQL source)
+reporting_timezone: America/Los_Angeles
+sources:
+  usage:
+    type: file
+    path: examples/data/raw/api_calls_sample_*.jsonl
+    grain: call
+    columns: {ts: ts, account_id: account_id, status: status, input_tokens: input_tokens, request_id: request_id,
+              channel: channel, model: model_served, project_label: project_label, questions: questions,
+              max_choice_cardinality: max_choice_cardinality, latency_ms: latency_ms}
+  accounts:
+    type: sql
+    url: sqlite:///${TEST_DIR}/accounts_test.sqlite
+    query: SELECT id, name, created_at, plan, source FROM orgs
+    columns: {account_id: id, display_name: name, signup_date: created_at, segment: plan, channel: source}
+  contracts: {skip: true}
+  pipeline: {skip: true}
+  billing_ledger: {skip: true}
+  gateway_statements: {skip: true}
+  hourly: {skip: true}
+  label_map: {type: file, path: reference/label_map.csv, columns: {project_label: project_label, use_case: use_case}}
+billing: {billable_statuses: [200], prices: [{effective_from: 2026-09-15, price_per_mtok: 0.042}], free_credit_usd: 5.0, free_credit_channels: [direct]}
+gateways: {openrouter: {fee_pct: 0.05, passes_customer_ids: false}}
+outputs: {dir: tests/outputs}
