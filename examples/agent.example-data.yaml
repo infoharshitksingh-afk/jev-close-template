@@ -1,0 +1,198 @@
+# Agent settings for the synthetic example close. Every name and Slack ID here is made up.
+# Used by: python -m agent replay
+company_name: Example Co (synthetic)
+outputs_dir: examples/outputs
+close_month: latest
+model: claude-sonnet-5-5
+log_path: examples/outputs/agent/questions.sqlite
+slack:
+  channels:
+  - '#finance-close'
+  owner_reminder_hours: 24
+blocked_columns:
+- state
+- prompt
+- content
+- messages
+- request_body
+- response_body
+close_lead:
+  name: Jordan (close lead)
+  slack_id: U0JORDAN
+areas:
+  usage_data:
+    name: Usage data and logs
+    owner:
+      name: Priya (data eng)
+      slack_id: U0PRIYA
+    backup:
+      name: ''
+      slack_id: ''
+    checks:
+    - 1
+    - 2
+    - 3
+    assumptions:
+    - 9
+    - 10
+    - 11
+    keywords:
+    - logs
+    - missing days
+    - duplicate
+    - request id
+    - account id
+    - timezone
+    - export
+    - warehouse
+  billing:
+    name: Billing and invoices
+    owner:
+      name: Dev (billing)
+      slack_id: U0DEV
+    backup:
+      name: Rosa (controller)
+      slack_id: U0ROSA
+    checks:
+    - 4
+    - 5
+    - 6
+    - 7
+    assumptions:
+    - 1
+    - 2
+    - 3
+    - 4
+    keywords:
+    - invoice
+    - billed
+    - price
+    - free credit
+    - status
+    - '429'
+    - '529'
+    - timeout
+    - stripe
+    - meter
+  revenue_accounting:
+    name: Revenue recognition
+    owner:
+      name: Rosa (controller)
+      slack_id: U0ROSA
+    backup:
+      name: ''
+      slack_id: ''
+    checks:
+    - 11
+    assumptions:
+    - 5
+    - 6
+    - 7
+    - 8
+    keywords:
+    - asc 606
+    - deferred
+    - prepaid
+    - gross
+    - net
+    - recognize
+    - true-up accounting
+    - breakage
+  enterprise_contracts:
+    name: Enterprise contracts and pipeline
+    owner:
+      name: Ana (GTM)
+      slack_id: U0ANA
+    backup:
+      name: ''
+      slack_id: ''
+    checks:
+    - 10
+    assumptions: []
+    keywords:
+    - contract
+    - commitment
+    - true-up
+    - discount
+    - renewal
+    - pipeline
+    - deal
+    - amendment
+  gateways:
+    name: Gateways and resellers
+    owner:
+      name: Sam (partnerships)
+      slack_id: U0SAM
+    backup:
+      name: ''
+      slack_id: ''
+    checks:
+    - 8
+    - 9
+    assumptions:
+    - 8
+    keywords:
+    - openrouter
+    - vercel
+    - digitalocean
+    - gateway
+    - statement
+    - remittance
+    - reseller
+    - partner fee
+  forecast:
+    name: Demand forecast
+    owner:
+      name: Maya (FP&A)
+      slack_id: U0MAYA
+    backup:
+      name: ''
+      slack_id: ''
+    checks: []
+    assumptions:
+    - 12
+    keywords:
+    - forecast
+    - cohort
+    - tail factor
+    - scenario
+    - growth
+    - ramp
+    - variance
+  capacity:
+    name: GPU capacity and serving cost
+    owner:
+      name: Kai (infra)
+      slack_id: U0KAI
+    backup:
+      name: ''
+      slack_id: ''
+    checks: []
+    assumptions:
+    - 14
+    keywords:
+    - gpu
+    - reserve
+    - capacity
+    - throughput
+    - tokens per second
+    - serving margin
+    - cluster
+  use_cases:
+    name: Use-case tags
+    owner:
+      name: Lena (product)
+      slack_id: U0LENA
+    backup:
+      name: ''
+      slack_id: ''
+    checks:
+    - 12
+    assumptions:
+    - 13
+    keywords:
+    - use case
+    - label
+    - project label
+    - tag
+    - inferred

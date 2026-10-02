@@ -1,0 +1,75 @@
+
+--- 1. A plain question: the agent answers from the data and cites where it came from ---
+
+Maya (FP&A): @close-agent what was net revenue in February, and what's driving the change from January?
+    close-agent: *Feb net revenue: $247.7k*, up 6.2% from Jan ($233.3k).
+      • Tokens up 7.0% (5,648B → 6,040B). Revenue grew a little slower because enterprise true-ups shrank by $1.0k: customers like Meridian Legal used more of what they'd committed to.
+      • Source: `monthly_summary` (sql/30_core.sql). In the workbook it's Summary!B8 → Monthly!H33 → Data_Monthly.
+      [Q-0001]
+    close-agent: @Maya (FP&A) Did this solve it? React ✅ if yes, ❌ if not. [Q-0001]
+    Maya (FP&A) reacted :white_check_mark: to the follow-up on Q-0001
+
+--- 2. Two sources disagree: the agent shows the gap and tags both owners ---
+
+Maya (FP&A): @close-agent check 6 flagged Meridian Legal for January. Is the invoice wrong or is the contract wrong?
+    close-agent: The data says *the invoice is off, not the total*:
+      • Jan invoice priced at $0.042/M (list). Contract C-206 says $0.0336/M (20% off) from Dec 15. Dec and Feb invoices both used $0.0336.
+      • Usage line is $1,459 too high and the true-up $1,459 too low, so the invoice total is still the $12,500 commitment. No cash difference this month, but revenue by line and the customer's statement are wrong.
+      @Dev (billing) was January billed at the wrong price? @Ana (GTM) was the contract amended in January?
+      [Q-0002]
+
+--- The billing owner replies in the thread (no @mention needed) ---
+
+    Dev (billing): Contract's right. Meridian's price in Stripe got reset to list when we migrated plans on Jan 3; fixed for Feb. Total's right so no credit note, but I'll reissue the Jan invoice with the right split.
+    close-agent: Got it, thanks @Dev (billing). Logged:
+      • Cause: Stripe plan migration on Jan 3 reset Meridian to list price. Fixed from Feb.
+      • Fix: reissue INV-202701-02022 as usage $5,834.68 + true-up $6,665.32 = $12,500. No credit note.
+      @Jordan (close lead) this is a billing correction, so it needs your OK. It also raises a question: did the Jan 3 migration reset anyone else? Check 6 only flagged Meridian, so the data says no.
+      [Q-0002]
+    close-agent: @Maya (FP&A) Did this solve it? React ✅ if yes, ❌ if not. [Q-0002]
+    Maya (FP&A) reacted :white_check_mark: to the follow-up on Q-0002
+
+--- 3. An owner's answer that doesn't fit the data: the asker says it didn't work, and the agent re-asks with evidence ---
+
+Maya (FP&A): @close-agent OpenRouter's January statement is 2.6% below our logs. Do we book their number or ours?
+    close-agent: January is the only month that doesn't tie:
+      • OpenRouter says 306.56B tokens, our logs say 314.74B (−2.6%, $344 gross, $327 net of their 5% fee).
+      • Dec and Feb match within 0.01%, so it looks like a one-off, not a definition difference.
+      Which number to book is a judgment call (assumption 8). @Sam (partnerships) which do we book for Jan, and should we dispute the gap?
+      [Q-0003]
+
+    Sam (partnerships): Book our logs. Their statement cuts the month at UTC midnight and we close in Pacific time, so ~8 hours of Jan 31 land in their February.
+    close-agent: Thanks @Sam (partnerships). Logged: book January from our logs ($13,219 gross). Gap explained as UTC vs Pacific month cut-off.
+      [Q-0003]
+    close-agent: @Maya (FP&A) Did this solve it? React ✅ if yes, ❌ if not. [Q-0003]
+    Maya (FP&A) reacted :x: to the follow-up on Q-0003
+    close-agent: Noted, that didn't solve it [Q-0003]. What's still off? Reply here and tag me, and I'll dig further or ask the owner.
+
+    Maya (FP&A): @close-agent the cut-off story doesn't fit. If 8 hours of Jan 31 moved into their February, Feb would be over by the same amount. Can you check?
+    close-agent: Maya's right, the numbers don't support the cut-off explanation:
+      • Jan statement is short 8.18B tokens. 8 hours of our OpenRouter volume is about 3.4B.
+      • Feb ties exactly (0.00B). If Jan 31 had moved into their Feb, Feb would be over by the same amount.
+      Booking our logs still stands, but the gap isn't explained. @Sam (partnerships) can you ask OpenRouter for their January daily totals? That would show which days are missing.
+      [Q-0003]
+
+--- 4. A policy question the data can't settle: the agent shows what it can and asks the owner ---
+
+Leo (engineering): @close-agent if a call times out (408), do we bill it? Thinking about a retry change.
+    close-agent: What I can see: the close bills only status 200, and February's logs have no 408s at all (just 200, 429 and 529). So the data can't tell us what billing does with a timeout.
+      @Dev (billing) are 408 timeouts billed?
+      [Q-0004]
+
+    Dev (billing): No. Only 200s reach the meter. Timeouts and 5xx are never billed.
+    close-agent: Thanks @Dev (billing). So @Leo (engineering), timeouts aren't billed: only 200s reach the meter. The close already works this way, so nothing changes. Logged as confirming assumption 2.
+      [Q-0004]
+    close-agent: @Leo (engineering) Did this solve it? React ✅ if yes, ❌ if not. [Q-0004]
+    Leo (engineering) reacted :white_check_mark: to the follow-up on Q-0004
+
+--- 5. A repeat question: the agent answers from the log instead of tagging the owner again ---
+
+Ana (GTM): @close-agent Meridian is asking about their January invoice. Was it wrong?
+    close-agent: Already settled in [Q-0002]: the *total was right* ($12,500, their commitment) but the lines were split at list price after a Jan 3 Stripe migration. Billing is reissuing INV-202701-02022 as usage $5,834.68 + true-up $6,665.32. Nothing extra to pay or credit.
+      [Q-0005]
+    close-agent: @Ana (GTM) Did this solve it? React ✅ if yes, ❌ if not. [Q-0005]
+    Ana (GTM) reacted :white_check_mark: to the follow-up on Q-0005
+

@@ -1,0 +1,276 @@
+# Scripted demo of the close agent on the synthetic February 2027 close.
+#   python -m agent replay
+#
+# "say" is what a person posts. "agent" is what the model decides to do: the tool calls run for
+# real against examples/outputs and write a real question log; "reply" is what it posts.
+# With an API key, `python -m agent chat` lets Claude make these decisions live instead.
+# All names, IDs and numbers are synthetic.
+
+people:
+  U0LEO: Leo (engineering)
+
+events:
+  # ------------------------------------------------------------------ 1. answered from data
+  - note: "1. A plain question: the agent answers from the data and cites where it came from"
+    thread: t1
+    as: Maya (FP&A)
+    say: "@close-agent what was net revenue in February, and what's driving the change from January?"
+    agent:
+      - tool: search_log
+        input: {text: "net revenue february january"}
+      - tool: log_question
+        input:
+          question: "What was net revenue in February, and what's driving the change from January?"
+          area: revenue_accounting
+          problem: "Month-on-month revenue bridge for the close memo"
+      - tool: run_sql
+        input:
+          sql: >
+            SELECT strftime(month, '%Y-%m') AS month, segment,
+                   ROUND(SUM(billable_tokens)/1e9, 1) AS billable_B_tokens,
+                   ROUND(SUM(net_revenue)) AS net_revenue, ROUND(SUM(true_up)) AS true_up
+            FROM monthly_summary WHERE month >= DATE '2027-01-01'
+            GROUP BY ALL ORDER BY segment, month
+      - tool: trace_cell
+        input: {sheet: Summary, cell: B8}
+      - tool: record_answer
+        input:
+          question_id: Q-0001
+          answer: >
+            Feb net revenue $247.7k vs $233.3k in Jan (+6.2%). Tokens rose 7.0% (5,648B to 6,040B).
+            Enterprise true-ups fell $1.0k as Meridian Legal and others used more of their commitments.
+          evidence: "monthly_summary (sql/30_core.sql); Summary!B8 = Monthly!H33 = SUM of Monthly segment rows, from Data_Monthly"
+      - reply: |
+          *Feb net revenue: $247.7k*, up 6.2% from Jan ($233.3k).
+          • Tokens up 7.0% (5,648B → 6,040B). Revenue grew a little slower because enterprise true-ups shrank by $1.0k: customers like Meridian Legal used more of what they'd committed to.
+          • Source: `monthly_summary` (sql/30_core.sql). In the workbook it's Summary!B8 → Monthly!H33 → Data_Monthly.
+          [Q-0001]
+
+  - react: {as: Maya (FP&A), question: Q-0001, emoji: white_check_mark}
+
+  # ------------------------------------------------------------------ 2. sources disagree -> tag two owners
+  - note: "2. Two sources disagree: the agent shows the gap and tags both owners"
+    thread: t2
+    as: Maya (FP&A)
+    say: "@close-agent check 6 flagged Meridian Legal for January. Is the invoice wrong or is the contract wrong?"
+    agent:
+      - tool: search_log
+        input: {text: "Meridian Legal price invoice contract"}
+      - tool: log_question
+        input:
+          question: "Check 6 flagged Meridian Legal for January. Is the invoice wrong or the contract?"
+          area: billing
+          problem: "Invoice unit price doesn't match the contract price (check 6, Jan 2027)"
+      - tool: run_sql
+        input:
+          sql: >
+            SELECT strftime(l.month, '%Y-%m') AS month, l.unit_price_per_mtok AS invoice_price,
+                   c.unit_price_per_mtok AS contract_price, c.discount_pct, c.start_date,
+                   l.usage_charge_usd, l.true_up_usd, l.invoice_total_usd
+            FROM src_billing_ledger l JOIN accounts a USING (account_id)
+            JOIN src_contracts c USING (account_id)
+            WHERE a.display_name = 'Meridian Legal' ORDER BY 1
+      - tool: escalate
+        input:
+          question_id: Q-0002
+          area: billing
+          reason: sources_disagree
+          question_for_owner: "Meridian's Jan invoice used list $0.042/M; the contract (C-206) says $0.0336/M from Dec 15, and Dec and Feb invoices used $0.0336. Was January billed at the wrong price?"
+          agent_answer_so_far: "Jan invoice at $0.042/M vs contract $0.0336/M: usage line $1,459 too high, true-up $1,459 too low, total still $12,500 (commitment floor)."
+      - tool: escalate
+        input:
+          question_id: Q-0002
+          area: enterprise_contracts
+          reason: sources_disagree
+          question_for_owner: "Was Meridian's contract amended in January, or is $0.0336/M still the price?"
+      - reply: |
+          The data says *the invoice is off, not the total*:
+          • Jan invoice priced at $0.042/M (list). Contract C-206 says $0.0336/M (20% off) from Dec 15. Dec and Feb invoices both used $0.0336.
+          • Usage line is $1,459 too high and the true-up $1,459 too low, so the invoice total is still the $12,500 commitment. No cash difference this month, but revenue by line and the customer's statement are wrong.
+          <@U0DEV> was January billed at the wrong price? <@U0ANA> was the contract amended in January?
+          [Q-0002]
+
+  - note: "The billing owner replies in the thread (no @mention needed)"
+    thread: t2
+    as: Dev (billing)
+    say: "Contract's right. Meridian's price in Stripe got reset to list when we migrated plans on Jan 3; fixed for Feb. Total's right so no credit note, but I'll reissue the Jan invoice with the right split."
+    agent:
+      - tool: record_owner_answer
+        input:
+          question_id: Q-0002
+          answer: "Contract price is right. Stripe reset Meridian to list price in the Jan 3 plan migration; fixed from Feb. Total is right, so no credit note; Jan invoice will be reissued with the correct usage / true-up split."
+          answered_by: "Dev (billing) <@U0DEV>"
+          decision: "Reissue Jan invoice INV-202701-02022: usage $5,834.68 + true-up $6,665.32 = $12,500. Check 6 Jan FLAG explained. Ask billing to check other accounts migrated on Jan 3."
+          change_type: billing_correction
+      - reply: |
+          Got it, thanks <@U0DEV>. Logged:
+          • Cause: Stripe plan migration on Jan 3 reset Meridian to list price. Fixed from Feb.
+          • Fix: reissue INV-202701-02022 as usage $5,834.68 + true-up $6,665.32 = $12,500. No credit note.
+          <@U0JORDAN> this is a billing correction, so it needs your OK. It also raises a question: did the Jan 3 migration reset anyone else? Check 6 only flagged Meridian, so the data says no.
+          [Q-0002]
+
+  - react: {as: Maya (FP&A), question: Q-0002, emoji: white_check_mark}
+
+  # ------------------------------------------------------------------ 3. owner answer that doesn't hold up
+  - note: "3. An owner's answer that doesn't fit the data: the asker says it didn't work, and the agent re-asks with evidence"
+    thread: t3
+    as: Maya (FP&A)
+    say: "@close-agent OpenRouter's January statement is 2.6% below our logs. Do we book their number or ours?"
+    agent:
+      - tool: search_log
+        input: {text: "openrouter statement gateway book"}
+      - tool: log_question
+        input:
+          question: "OpenRouter's January statement is 2.6% below our logs. Do we book their number or ours?"
+          area: gateways
+          problem: "Gateway statement vs our logs (check 8, OpenRouter Jan 2027)"
+      - tool: run_sql
+        input:
+          sql: >
+            SELECT strftime(s.month, '%Y-%m') AS month, ROUND(s.tokens_reported/1e9, 2) AS statement_B,
+                   ROUND(r.t/1e9, 2) AS our_logs_B, ROUND(s.tokens_reported / r.t - 1, 4) AS gap,
+                   s.gross_usd, ROUND(r.rev, 2) AS our_gross_usd
+            FROM src_gateway_statements s
+            JOIN (SELECT month, SUM(billable_tokens) AS t, SUM(usage_revenue) AS rev
+                  FROM revenue_expected WHERE channel = 'openrouter' GROUP BY 1) r USING (month)
+            WHERE s.gateway = 'openrouter' AND s.month >= DATE '2026-12-01' ORDER BY 1
+      - tool: read_assumption
+        input: {number: 8}
+      - tool: escalate
+        input:
+          question_id: Q-0003
+          area: gateways
+          reason: judgment_call
+          question_for_owner: "OpenRouter's Jan statement shows 306.56B tokens vs 314.74B in our logs (-2.6%, $344 gross). Dec and Feb match within 0.01%. Which number do we book for January, and do we dispute the gap?"
+          agent_answer_so_far: "Jan statement -2.6% vs our logs; Dec and Feb tie."
+      - reply: |
+          January is the only month that doesn't tie:
+          • OpenRouter says 306.56B tokens, our logs say 314.74B (−2.6%, $344 gross, $327 net of their 5% fee).
+          • Dec and Feb match within 0.01%, so it looks like a one-off, not a definition difference.
+          Which number to book is a judgment call (assumption 8). <@U0SAM> which do we book for Jan, and should we dispute the gap?
+          [Q-0003]
+
+  - thread: t3
+    as: Sam (partnerships)
+    say: "Book our logs. Their statement cuts the month at UTC midnight and we close in Pacific time, so ~8 hours of Jan 31 land in their February."
+    agent:
+      - tool: record_owner_answer
+        input:
+          question_id: Q-0003
+          answer: "Book our logs. OpenRouter cuts months at UTC midnight; we close in Pacific time, so ~8 hours of Jan 31 fall into their February."
+          answered_by: "Sam (partnerships) <@U0SAM>"
+          decision: "Book January from our logs ($13,219 gross). Gap explained as a month cut-off difference."
+          change_type: explanation_only
+      - reply: |
+          Thanks <@U0SAM>. Logged: book January from our logs ($13,219 gross). Gap explained as UTC vs Pacific month cut-off.
+          [Q-0003]
+
+  - react: {as: Maya (FP&A), question: Q-0003, emoji: x}
+
+  - thread: t3
+    as: Maya (FP&A)
+    say: "@close-agent the cut-off story doesn't fit. If 8 hours of Jan 31 moved into their February, Feb would be over by the same amount. Can you check?"
+    agent:
+      - tool: search_log
+        input: {text: "openrouter cut-off", area: gateways}
+      - tool: run_sql
+        input:
+          sql: >
+            WITH ours AS (
+              SELECT month, SUM(billable_tokens) AS t FROM revenue_expected
+              WHERE channel = 'openrouter' GROUP BY 1)
+            SELECT strftime(s.month, '%Y-%m') AS month, ROUND((s.tokens_reported - o.t)/1e9, 2) AS statement_minus_ours_B,
+                   ROUND(o.t / 1e9 / 31 * 8 / 24, 2) AS eight_hours_of_our_volume_B
+            FROM src_gateway_statements s JOIN ours o USING (month)
+            WHERE s.gateway = 'openrouter' AND s.month IN (DATE '2027-01-01', DATE '2027-02-01') ORDER BY 1
+      - tool: record_outcome
+        input:
+          question_id: Q-0003
+          worked: "no"
+          note: "Cut-off explanation doesn't fit: Jan statement is 8.18B short, 8 hours is ~3.4B, and Feb ties at 0.00B instead of being over."
+      - tool: escalate
+        input:
+          question_id: Q-0003
+          area: gateways
+          reason: contradicts_prior_decision
+          question_for_owner: "The cut-off explanation doesn't fit the data: Jan is short 8.18B tokens, 8 hours of our volume is ~3.4B, and Feb ties exactly instead of being over. Can you ask OpenRouter for their January daily totals so we can find the missing days?"
+      - reply: |
+          Maya's right, the numbers don't support the cut-off explanation:
+          • Jan statement is short 8.18B tokens. 8 hours of our OpenRouter volume is about 3.4B.
+          • Feb ties exactly (0.00B). If Jan 31 had moved into their Feb, Feb would be over by the same amount.
+          Booking our logs still stands, but the gap isn't explained. <@U0SAM> can you ask OpenRouter for their January daily totals? That would show which days are missing.
+          [Q-0003]
+
+  # ------------------------------------------------------------------ 4. judgment call, confirmed
+  - note: "4. A policy question the data can't settle: the agent shows what it can and asks the owner"
+    thread: t4
+    as: Leo (engineering)
+    say: "@close-agent if a call times out (408), do we bill it? Thinking about a retry change."
+    agent:
+      - tool: search_log
+        input: {text: "408 timeout billed status"}
+      - tool: log_question
+        input:
+          question: "If a call times out (408), do we bill it?"
+          area: billing
+          problem: "Billable status rules, ahead of a retry change"
+      - tool: run_sql
+        input:
+          sql: >
+            SELECT status, SUM(calls) AS calls, SUM(input_tokens) AS input_tokens
+            FROM src_usage WHERE date >= DATE '2027-02-01' GROUP BY 1 ORDER BY 1
+      - tool: read_assumption
+        input: {number: 2}
+      - tool: escalate
+        input:
+          question_id: Q-0004
+          area: billing
+          reason: judgment_call
+          question_for_owner: "Are 408 timeouts billed? The close bills only status 200 (billing.billable_statuses), and Feb logs show only 200, 429 and 529, so there's no data on 408s."
+          agent_answer_so_far: "The close bills only 200s. Feb logs have no 408s (only 200, 429, 529)."
+      - reply: |
+          What I can see: the close bills only status 200, and February's logs have no 408s at all (just 200, 429 and 529). So the data can't tell us what billing does with a timeout.
+          <@U0DEV> are 408 timeouts billed?
+          [Q-0004]
+
+  - thread: t4
+    as: Dev (billing)
+    say: "No. Only 200s reach the meter. Timeouts and 5xx are never billed."
+    agent:
+      - tool: record_owner_answer
+        input:
+          question_id: Q-0004
+          answer: "No. Only 200s reach the billing meter; timeouts and 5xx are never billed."
+          answered_by: "Dev (billing) <@U0DEV>"
+          decision: "Confirms billing.billable_statuses = [200]. LOGIC_REVIEW assumption 2 confirmed by billing."
+          change_type: none
+      - reply: |
+          Thanks <@U0DEV>. So <@U0LEO>, timeouts aren't billed: only 200s reach the meter. The close already works this way, so nothing changes. Logged as confirming assumption 2.
+          [Q-0004]
+
+  - react: {as: Leo (engineering), question: Q-0004, emoji: white_check_mark}
+
+  # ------------------------------------------------------------------ 5. answered from the log, no re-tag
+  - note: "5. A repeat question: the agent answers from the log instead of tagging the owner again"
+    thread: t5
+    as: Ana (GTM)
+    say: "@close-agent Meridian is asking about their January invoice. Was it wrong?"
+    agent:
+      - tool: search_log
+        input: {text: "Meridian January invoice"}
+      - tool: log_question
+        input:
+          question: "Meridian is asking about their January invoice. Was it wrong?"
+          area: billing
+          problem: "Customer asking about January invoice"
+          related_to: Q-0002
+      - tool: record_answer
+        input:
+          question_id: Q-0005
+          answer: "Yes, the split was wrong but the total was right. Billing is reissuing INV-202701-02022 (usage $5,834.68 + true-up $6,665.32 = $12,500). See Q-0002."
+          evidence: "Q-0002, owner answer from Dev (billing)"
+      - reply: |
+          Already settled in [Q-0002]: the *total was right* ($12,500, their commitment) but the lines were split at list price after a Jan 3 Stripe migration. Billing is reissuing INV-202701-02022 as usage $5,834.68 + true-up $6,665.32. Nothing extra to pay or credit.
+          [Q-0005]
+
+  - react: {as: Ana (GTM), question: Q-0005, emoji: white_check_mark}

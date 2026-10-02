@@ -1,0 +1,93 @@
+# Close agent settings. Copy to agent/agent.yaml (git-ignored) and fill in the Slack IDs.
+#   python -m agent setup     walks through this file and checks every ID you enter
+#
+# Slack member ID: click a person's name > View full profile > ... > Copy member ID (starts with U).
+# Slack user group ID (e.g. @billing-team): Workspace settings > User groups, or ask an admin (starts with S).
+# Leave slack_id empty if nobody owns an area yet: the agent will tag the close lead instead.
+
+company_name: TypeSafe AI
+outputs_dir: outputs            # where `python jevclose.py run` writes (relative to the repo)
+close_month: latest             # or YYYY-MM to pin the agent to one close
+model: claude-sonnet-5-5        # any Claude model your API key can use
+log_path: outputs/agent/questions.sqlite   # the question log (exported to Excel on demand)
+
+slack:
+  # Channels the agent answers in. Empty = anywhere it's invited.
+  channels: ["#finance-close"]
+  # Hours to wait for an owner before tagging their backup, then the close lead.
+  owner_reminder_hours: 24
+
+# Words the agent refuses to query, so customer request content can never be read.
+blocked_columns: [state, prompt, content, messages, request_body, response_body]
+
+# Who signs off the close. Gets anything with no owner, and every change to config or inputs.
+close_lead:
+  name: Close lead
+  slack_id: ""
+
+# Each area: who owns it, what it covers, and words that point to it.
+# "checks" are check numbers in sql/50_checks.sql; "assumptions" are numbers in LOGIC_REVIEW.md.
+areas:
+  usage_data:
+    name: Usage data and logs
+    owner: {name: Data / platform engineer, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [1, 2, 3]
+    assumptions: [9, 10, 11]
+    keywords: [logs, missing days, duplicate, request id, account id, timezone, export, warehouse]
+
+  billing:
+    name: Billing and invoices
+    owner: {name: Billing owner, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [4, 5, 6, 7]
+    assumptions: [1, 2, 3, 4]
+    keywords: [invoice, billed, price, free credit, status, "429", "529", timeout, stripe, meter]
+
+  revenue_accounting:
+    name: Revenue recognition
+    owner: {name: Controller / accountant, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [11]
+    assumptions: [5, 6, 7, 8]
+    keywords: [asc 606, deferred, prepaid, gross, net, recognize, true-up accounting, breakage]
+
+  enterprise_contracts:
+    name: Enterprise contracts and pipeline
+    owner: {name: Account executive / GTM, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [10]
+    assumptions: []
+    keywords: [contract, commitment, true-up, discount, renewal, pipeline, deal, amendment]
+
+  gateways:
+    name: Gateways and resellers
+    owner: {name: Partnerships owner, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [8, 9]
+    assumptions: [8]
+    keywords: [openrouter, vercel, digitalocean, gateway, statement, remittance, reseller, partner fee]
+
+  forecast:
+    name: Demand forecast
+    owner: {name: Finance lead, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: []
+    assumptions: [12]
+    keywords: [forecast, cohort, tail factor, scenario, growth, ramp, variance]
+
+  capacity:
+    name: GPU capacity and serving cost
+    owner: {name: Inference / infra lead, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: []
+    assumptions: [14]
+    keywords: [gpu, reserve, capacity, throughput, tokens per second, serving margin, cluster]
+
+  use_cases:
+    name: Use-case tags
+    owner: {name: Product / developer platform, slack_id: ""}
+    backup: {name: "", slack_id: ""}
+    checks: [12]
+    assumptions: [13]
+    keywords: [use case, label, project label, tag, inferred]

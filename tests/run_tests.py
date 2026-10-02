@@ -96,4 +96,27 @@ else:
         worst = max(worst, abs(x / py[f"{s}|{months[n]}"] - 1))
     ok(worst < 1e-4, f"largest gap between Excel and Python: {worst:.2e}")
 
+print("5. Close agent (scripted Slack conversation, no API key)")
+from agent.simulate import replay  # noqa: E402
+from agent.tools import Agent, run_sql  # noqa: E402
+ag, slack, xlsx = replay("examples/agent_demo.yaml", "examples/agent.example-data.yaml",
+                         export_to=TESTS / "outputs" / "agent" / "log.xlsx", echo=False)
+log = {r["id"]: r for r in ag.log.all()}
+ok(len(log) == 5, "five questions logged")
+ok(log["Q-0001"]["escalated_to"] == "" and log["Q-0001"]["worked"] == "yes", "data question answered without tagging anyone")
+ok("<@U0DEV>" in log["Q-0002"]["escalated_to"] and "<@U0ANA>" in log["Q-0002"]["escalated_to"]
+   and log["Q-0002"]["area"] == "billing", "disagreeing sources tag both owners, area kept")
+ok(log["Q-0002"]["change_type"] == "billing_correction" and log["Q-0002"]["status"] == "closed", "owner answer recorded and closed")
+ok(log["Q-0003"]["worked"] == "no" and log["Q-0003"]["status"] == "waiting_on_owner"
+   and log["Q-0003"]["escalation_reason"] == "contradicts_prior_decision", "answer that didn't work is re-asked")
+ok(log["Q-0005"]["related_to"] == "Q-0002" and log["Q-0005"]["escalated_to"] == "", "repeat question answered from the log")
+posted = [m["text"] for m in slack.msgs.values() if m["user"] == "U0CLOSEBOT"]
+ok(any("<@U0JORDAN>" in t for t in posted), "billing correction routed to the close lead for approval")
+ok(xlsx.exists(), "question log exported to Excel")
+ag2 = Agent("examples/agent.example-data.yaml")
+for bad in ("DROP TABLE checks", "SELECT 1; DELETE FROM checks", "SELECT state FROM src_usage",
+            "SELECT * FROM read_csv_auto('/etc/passwd')", "SELECT * FROM raw_usage"):
+    ok("error" in run_sql(ag2, {}, bad), f"refused: {bad}")
+ok(run_sql(ag2, {}, "SELECT COUNT(*) FROM src_billing_ledger")["rows"][0][0] > 0, "source views still readable")
+
 print("All tests passed.")

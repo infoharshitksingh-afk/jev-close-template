@@ -1,0 +1,40 @@
+# Paste this at https://api.slack.com/apps > Create New App > From an app manifest.
+# Socket Mode means the app connects out to Slack: no public URL or open port needed.
+display_information:
+  name: Close Agent
+  description: Answers questions about the monthly close, asks owners when it can't, and logs every answer.
+  background_color: "#1f3a5f"
+features:
+  app_home:
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: close-agent
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read     # see @close-agent
+      - chat:write            # reply in threads
+      - channels:history      # read thread replies in public channels it's in (owner answers)
+      - groups:history        # same, private channels it's invited to
+      - im:history            # DMs to the bot
+      - im:read
+      - im:write
+      - reactions:read        # ✅ / ❌ on "did this solve it?"
+      - users:read            # names for the log
+      - channels:read         # channel names for the allow-list
+      - groups:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - reaction_added
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

@@ -115,6 +115,21 @@ billed, how free credit and gateway revenue are booked, and more.
 pipeline, investigates each flagged check with read-only SQL, drafts explanations in the workbook
 and a memo, and stops for a person to review. It never edits source data or check results.
 
+## Slack agent (optional)
+
+**[agent/](agent/)** puts the close in Slack. Ask `@close-agent` about any number and it answers
+from the warehouse, with the query or cell it used. When the data can't settle a question (a
+judgment call, two sources that disagree, an answer that contradicts an earlier decision), it
+tags the owner of that area. It logs the problem, the question, the answers and whether they
+worked, and exports the log to Excel.
+
+```bash
+python -m agent replay      # scripted demo on the example close: no Slack, no API key
+```
+
+Who owns what lives in one file, `agent/agent.yaml`, filled in at setup. Start with
+**[agent/ONBOARDING.md](agent/ONBOARDING.md)**.
+
 ## Security
 
 - `outputs/` holds customer names and revenue. It is in `.gitignore`; keep it there.
@@ -127,9 +142,10 @@ and a memo, and stops for a person to review. It never edits source data or chec
 python tests/run_tests.py
 ```
 
-Runs the example, a call-level close reading accounts from a SQL database, and a close with only
-the two required sources. If LibreOffice is installed, it also checks that the Excel formulas
-reproduce the Python forecast.
+Runs the example, a call-level close reading accounts from a SQL database, a close with only
+the two required sources, and the agent's scripted Slack conversation (including the SQL
+guard). If LibreOffice is installed, it also checks that the Excel formulas reproduce the Python
+forecast.
 
 ## License
 

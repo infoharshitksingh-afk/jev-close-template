@@ -10,3 +10,6 @@ config.yaml
 __pycache__/
 *.pyc
 .DS_Store
+
+# Close agent: Slack IDs and local settings, and its question log
+agent/agent.yaml
