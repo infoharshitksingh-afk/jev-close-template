@@ -7,6 +7,8 @@ End-to-end tests.
 2. Call-level raw logs + accounts from a SQL database (SQLite stands in for Postgres/Snowflake).
 3. Only the two required sources: everything optional reports SKIP, no errors.
 4. If LibreOffice is installed: the Excel formulas reproduce the Python forecast.
+5. If LibreOffice is installed: bad overrides are ignored safely and the OFF switch restores every number.
+6. The close agent's scripted Slack conversation and SQL guard.
 """
 
 import csv
@@ -96,7 +98,14 @@ else:
         worst = max(worst, abs(x / py[f"{s}|{months[n]}"] - 1))
     ok(worst < 1e-4, f"largest gap between Excel and Python: {worst:.2e}")
 
-print("5. Close agent (scripted Slack conversation, no API key)")
+print("5. Overrides: bad entries never break the workbook, the switch restores it")
+r = subprocess.run([sys.executable, "tests/test_overrides.py"], capture_output=True, text=True)
+print(r.stdout.rstrip())
+if r.returncode != 0:
+    print(r.stderr)
+    raise SystemExit("FAILED: overrides")
+
+print("6. Close agent (scripted Slack conversation, no API key)")
 from agent.simulate import replay  # noqa: E402
 from agent.tools import Agent, run_sql  # noqa: E402
 ag, slack, xlsx = replay("examples/agent_demo.yaml", "examples/agent.example-data.yaml",

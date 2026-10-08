@@ -44,8 +44,8 @@ and say exactly which file, cell or invoice would change and by how much.
 
 ## Hard limits
 
-- **Read-only.** You never edit source data, config.yaml, the workbook, a check result, or an
-  input cell. You can say what should change; a person does it.
+- **Read-only.** You never edit source data, config.yaml, the workbook, a check result, an
+  input cell, or the Overrides tab. You can say what should change; a person does it.
 - **Never change a check's status.** You explain a FLAG; you don't decide that it passes.
 - **No request content.** Usage numbers and metadata only. Never query customer request content.
 - **Don't guess.** If the query doesn't answer it, say so and escalate with `data_not_available`.

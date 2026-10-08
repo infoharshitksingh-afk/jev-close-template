@@ -99,9 +99,28 @@ actuals with this month's forecast.
 | Concentration | Dependence on the largest accounts |
 | Forecast, Forecast_Ent | Next three months, low / base / high, plus last month's forecast accuracy |
 | Capacity | GPUs to reserve vs rent, cost of each strategy, serving margin |
+| Overrides | Change an input or post a manual revenue adjustment, with one switch to undo everything |
 
-Blue cells are judgment inputs (forecast and capacity), seeded from `config.yaml`. Change them in
-Excel to test scenarios.
+### Changing numbers: the Overrides tab
+
+Every judgment input (forecast assumptions, GPU rates and throughput, forecast prices) lives on the
+**Overrides** tab. Each row shows the model value (seeded from `config.yaml` or calculated), a
+yellow override cell, the value actually used, and a status. Manual adjustments to net revenue
+(a credit note, a correction) go in the table below it and appear as their own line on Monthly.
+
+Overrides can't break the workbook:
+- A blank, a word, an error value or a number outside the row's allowed range is **ignored**, and
+  the row says why. The model value is used instead. Excel also blocks out-of-range typing.
+- An adjustment counts only if its month is a date in the 12-month window, the segment is from
+  the list, and the amount is a number.
+- **Master switch** (Overrides!C4): set it to OFF and every tab returns to the model values. What
+  you typed stays, so ON brings it back.
+- Summary and Start show how many overrides are applied, so nobody reads an adjusted number as
+  raw.
+
+Overrides change the workbook only. The runner's stored forecast (`forecast_history.csv`) and the
+close JSON keep the model values, so next month's forecast-vs-actual check compares against the
+unadjusted forecast. To make an override permanent, put it in `config.yaml`.
 
 ## Before trusting the numbers
 

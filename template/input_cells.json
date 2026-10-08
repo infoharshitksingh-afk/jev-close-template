@@ -1,70 +1,70 @@
 {
  "tail_factor.low": [
-  "Forecast",
-  "B6"
+  "Overrides",
+  "C8"
  ],
  "tail_factor.base": [
-  "Forecast",
-  "C6"
+  "Overrides",
+  "C9"
  ],
  "tail_factor.high": [
-  "Forecast",
-  "D6"
- ],
- "gateway_growth_decay": [
-  "Forecast",
+  "Overrides",
   "C10"
  ],
  "ent_usage_ratio.low": [
-  "Forecast",
-  "B11"
- ],
- "ent_usage_ratio.base": [
-  "Forecast",
+  "Overrides",
   "C11"
  ],
- "ent_usage_ratio.high": [
-  "Forecast",
-  "D11"
- ],
- "ent_growth.low": [
-  "Forecast",
-  "B12"
- ],
- "ent_growth.base": [
-  "Forecast",
+ "ent_usage_ratio.base": [
+  "Overrides",
   "C12"
  ],
- "ent_growth.high": [
-  "Forecast",
-  "D12"
- ],
- "ent_ramp_days": [
-  "Forecast",
+ "ent_usage_ratio.high": [
+  "Overrides",
   "C13"
  ],
+ "ent_growth.low": [
+  "Overrides",
+  "C14"
+ ],
+ "ent_growth.base": [
+  "Overrides",
+  "C15"
+ ],
+ "ent_growth.high": [
+  "Overrides",
+  "C16"
+ ],
+ "gateway_growth_decay": [
+  "Overrides",
+  "C18"
+ ],
+ "ent_ramp_days": [
+  "Overrides",
+  "C19"
+ ],
  "capacity.gpu_tokens_per_sec": [
-  "Capacity",
-  "B6"
+  "Overrides",
+  "C23"
  ],
  "capacity.peak_utilization": [
-  "Capacity",
-  "B7"
+  "Overrides",
+  "C24"
  ],
  "capacity.reserved_rate": [
-  "Capacity",
-  "B8"
+  "Overrides",
+  "C25"
  ],
  "capacity.on_demand_rate": [
-  "Capacity",
-  "B9"
+  "Overrides",
+  "C26"
  ],
  "capacity.peak_ratio_override": [
-  "Capacity",
-  "B10"
+  "Overrides",
+  "C27"
  ],
  "capacity.base_ratio_override": [
-  "Capacity",
-  "B11"
+  "Overrides",
+  "C28"
  ]
 }

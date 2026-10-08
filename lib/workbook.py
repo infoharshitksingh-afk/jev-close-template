@@ -10,9 +10,10 @@ any month and any company size.
 """
 
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule
+from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter as CL
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from .schema import (DATA_SHEETS, MAX_CHANNELS, MAX_CHECK_ROWS, MAX_CONC, MAX_CONTRACTS, MAX_DEALS,
                      MAX_USE_CASES, PARAMS, P, WINDOW)
@@ -52,6 +53,14 @@ WSTART = P("window_start")
 
 # Cells the runner seeds from config (the team can still edit them in Excel afterwards).
 INPUT_CELLS = {}
+
+# Overrides tab layout. One switch turns every override and adjustment on or off.
+OV_SWITCH = "Overrides!$C$4"
+OV_IN0, OV_INMAX = 8, 39          # input override rows
+OV_ADJ0, OV_ADJN = 46, 30         # manual adjustment rows (46..75)
+OV_ADJ_LAST = OV_ADJ0 + OV_ADJN - 1
+SEGMENTS = ("enterprise", "self_serve", "gateway_aggregate", "unmatched")
+OVFILL = PatternFill("solid", fgColor="FFF2CC")
 
 
 def put(ws, ref, v, font=BLACK, fmt=None, fill=None, wrap=False):
@@ -135,6 +144,86 @@ def build(path):
         dp[P(k).split("!")[1].replace("$", "")].number_format = DATEF
     widths(dp, {"A": 26, "B": 22, "C": 60})
 
+    # ======================================================================== Overrides
+    OV = wb.create_sheet("Overrides")
+    OV.sheet_properties.tabColor = "E69138"
+    title(OV, "Overrides: change a number without touching the data",
+          "Type in the yellow cells only. Every override is checked: a blank, a word, an error or a value outside the allowed range is ignored and the model value is used.")
+    put(OV, "A4", "Master switch", BOLD)
+    put(OV, "C4", "ON", RED_B, None, OVFILL)
+    put(OV, "D4", 'ON = use the overrides and adjustments below. OFF = every tab goes back to the model values; nothing typed here is lost.', SUB)
+    sw = DataValidation(type="list", formula1='"ON,OFF"', allow_blank=False, showErrorMessage=True,
+                        errorTitle="ON or OFF", error="Choose ON or OFF.")
+    OV.add_data_validation(sw)
+    sw.add("C4")
+    put(OV, "A5", "Active now", BOLD)
+    put(OV, "C5", f'=IF({OV_SWITCH}<>"ON","Switch is OFF: model values everywhere",'
+                  f'COUNTIF($F${OV_IN0}:$F${OV_INMAX},"Applied")&" input(s) and "&COUNTIF($H${OV_ADJ0}:$H${OV_ADJ_LAST},"Applied")&" adjustment(s) applied")', BOLD)
+    header(OV, OV_IN0 - 1, ["Key", "Input", "Model value", "Override", "Used", "Status", "Allowed range", "Why / who / date"])
+    ov_rows = {}
+
+    def ovr(key, label, default, fmt, lo, hi, seeded=True):
+        """Register an overridable input. Returns the absolute ref of the value the model uses."""
+        rr = OV_IN0 + len(ov_rows)
+        assert rr <= OV_INMAX, "too many overrides: raise OV_INMAX"
+        ov_rows[key] = rr
+        put(OV, f"A{rr}", key, SUB)
+        put(OV, f"B{rr}", label)
+        put(OV, f"C{rr}", default, BLUE if seeded else BLACK, fmt)
+        put(OV, f"D{rr}", None, BLUE, fmt, OVFILL)
+        D = f"D{rr}"
+        ok = f"AND({OV_SWITCH}=\"ON\",ISNUMBER({D}),{D}>={lo},{D}<={hi})"
+        put(OV, f"E{rr}", f"=IFERROR(IF({ok},{D},C{rr}),C{rr})", BOLD, fmt)
+        put(OV, f"F{rr}", f'=IFERROR(IF(ISBLANK({D}),"",IF({OV_SWITCH}<>"ON","Switch OFF",IF(ISERROR({D}),"Ignored: error value",IF(NOT(ISNUMBER({D})),"Ignored: not a number",'
+                          f'IF(OR({D}<{lo},{D}>{hi}),"Ignored: outside range","Applied"))))),"Ignored: error value")')
+        put(OV, f"G{rr}", f"{lo:g} to {hi:g}", SUB)
+        OV[f"H{rr}"].fill = INFILL
+        dv = DataValidation(type="decimal", operator="between", formula1=str(lo), formula2=str(hi), allow_blank=True,
+                            showErrorMessage=True, errorStyle="stop", errorTitle="Outside the allowed range",
+                            error=f"Enter a number from {lo:g} to {hi:g}, or leave blank to use the model value.")
+        OV.add_data_validation(dv)
+        dv.add(D)
+        if seeded:
+            INPUT_CELLS[key] = ("Overrides", f"C{rr}")
+        return f"Overrides!$E${rr}"
+
+    # manual adjustments to reported net revenue
+    put(OV, f"A{OV_ADJ0 - 3}", "Manual adjustments to net revenue (credit notes, corrections). Shown as their own line on Monthly, included in totals.", BOLD)
+    put(OV, f"A{OV_ADJ0 - 2}", "Month = any date in the month. Segment = pick from the list. Amount in $ (negative reduces revenue). Ignored unless all three are valid and the month is in the 12-month window.", SUB)
+    header(OV, OV_ADJ0 - 1, ["Month", "Segment", "Amount ($)", "Reason", "Approved by", "Month used", "Amount used ($)", "Status"])
+    segdv = DataValidation(type="list", formula1='"' + ",".join(SEGMENTS) + '"', allow_blank=True, showErrorMessage=True,
+                           errorTitle="Segment", error="Pick a segment from the list.")
+    amtdv = DataValidation(type="decimal", operator="between", formula1="-100000000", formula2="100000000", allow_blank=True,
+                           showErrorMessage=True, errorTitle="Amount", error="Enter an amount in dollars.")
+    datedv = DataValidation(type="date", operator="between", formula1="36526", formula2="73051", allow_blank=True,
+                            showErrorMessage=True, errorTitle="Month", error="Enter a date, e.g. 2027-02-01.")
+    for dv_ in (segdv, amtdv, datedv):
+        OV.add_data_validation(dv_)
+    seg_ok = "OR(" + ",".join(f'B{{r}}="{x}"' for x in SEGMENTS) + ")"
+    for rr in range(OV_ADJ0, OV_ADJ_LAST + 1):
+        for col in "ABCDE":
+            OV[f"{col}{rr}"].fill = OVFILL if col in "ABC" else INFILL
+            OV[f"{col}{rr}"].font = BLUE
+        OV[f"A{rr}"].number_format = DATEF
+        OV[f"C{rr}"].number_format = USD2
+        datedv.add(f"A{rr}"); segdv.add(f"B{rr}"); amtdv.add(f"C{rr}")
+        put(OV, f"F{rr}", f'=IFERROR(IF(ISNUMBER(A{rr}),DATE(YEAR(A{rr}),MONTH(A{rr}),1),""),"")', BLACK, MONF)
+        valid = (f'AND({OV_SWITCH}="ON",ISNUMBER(F{rr}),ISNUMBER(C{rr}),{seg_ok.format(r=rr)},'
+                 f'F{rr}>={WSTART},F{rr}<={ASOF})')
+        put(OV, f"G{rr}", f"=IFERROR(IF({valid},C{rr},0),0)", BLACK, USD2)
+        put(OV, f"H{rr}", f'=IFERROR(IF(AND(ISBLANK(A{rr}),ISBLANK(B{rr}),ISBLANK(C{rr})),"",IF({OV_SWITCH}<>"ON","Switch OFF",'
+                          f'IF(OR(ISERROR(A{rr}),ISERROR(B{rr}),ISERROR(C{rr})),"Ignored: error value",IF(NOT(ISNUMBER(F{rr})),"Ignored: month is not a date",IF(NOT({seg_ok.format(r=rr)}),"Ignored: unknown segment",'
+                          f'IF(NOT(ISNUMBER(C{rr})),"Ignored: amount is not a number",IF(OR(F{rr}<{WSTART},F{rr}>{ASOF}),'
+                          f'"Ignored: month outside the window","Applied"))))))),"Ignored: error value")')
+    stat = f"F{OV_IN0}:F{OV_INMAX} H{OV_ADJ0}:H{OV_ADJ_LAST}"
+    OV.conditional_formatting.add(stat, FormulaRule(formula=[f'LEFT(F{OV_IN0},7)="Ignored"'], fill=PatternFill("solid", fgColor="F8D7DA")))
+    OV.conditional_formatting.add(stat, FormulaRule(formula=[f'F{OV_IN0}="Applied"'], fill=PatternFill("solid", fgColor="D4EDDA")))
+    OV.conditional_formatting.add("C4", FormulaRule(formula=['$C$4="ON"'], fill=PatternFill("solid", fgColor="D4EDDA")))
+    widths(OV, {"A": 26, "B": 44, "C": 14, "D": 14, "E": 14, "F": 24, "G": 16, "H": 40})
+    OV.freeze_panes = f"C{OV_IN0}"
+    ADJ_MONTH = f"Overrides!$F${OV_ADJ0}:$F${OV_ADJ_LAST}"
+    ADJ_AMT = f"Overrides!$G${OV_ADJ0}:$G${OV_ADJ_LAST}"
+
     # ======================================================================== Monthly
     M = wb.create_sheet("Monthly", 0)
     title(M, "Usage and revenue by month", "Formulas only: every number reads the Data_ sheets. Tokens in billions, $ in thousands.")
@@ -195,9 +284,13 @@ def build(path):
         for j in range(WINDOW):
             put(M, f"{MC[j]}{r}", f"={seg_sum('L', seg, j)}/1E3", BLACK, NUM1)
         rev_rows.append(r); r += 1
+    put(M, f"A{r}", "Manual adjustments (Overrides tab)")
+    for j in range(WINDOW):
+        put(M, f"{MC[j]}{r}", f"=SUMIFS({ADJ_AMT},{ADJ_MONTH},{MC[j]}$4)/1E3", GREEN, NUM1)
+    M_ADJ = r; r += 1
     put(M, f"A{r}", "Total net revenue", BOLD)
     for j in range(WINDOW):
-        put(M, f"{MC[j]}{r}", f"=SUM({MC[j]}{rev_rows[0]}:{MC[j]}{rev_rows[-1]})", BOLD, NUM1)
+        put(M, f"{MC[j]}{r}", f"=SUM({MC[j]}{rev_rows[0]}:{MC[j]}{M_ADJ})", BOLD, NUM1)
     M_REV = r; r += 1
     put(M, f"A{r}", "  of which enterprise true-ups")
     for j in range(WINDOW):
@@ -379,7 +472,7 @@ def build(path):
 
     # ======================================================================== Forecast
     FS = wb.create_sheet("Forecast")
-    title(FS, "Demand forecast: next three months", "Self-serve by cohort (chain-ladder) + gateway trend + enterprise contracts and pipeline (Forecast_Ent). Blue cells are judgment inputs, seeded from config.")
+    title(FS, "Demand forecast: next three months", "Self-serve by cohort (chain-ladder) + gateway trend + enterprise contracts and pipeline (Forecast_Ent). Green input cells link to the Overrides tab, where the values are set.")
     SC = {"low": "B", "base": "C", "high": "D"}
     SCN = ("low", "base", "high")
     put(FS, "A4", "Assumptions", BOLD)
@@ -426,32 +519,29 @@ def build(path):
             put(FS, f"{TC(k)}{rr}", f'=IF({ACT(i, k)}>0,{ACT(i, k + 1)}/{ACT(i, k)},"")', BLACK, MULT)
 
 
-    # inputs that reference the data
-    INPUT_CELLS.update({"tail_factor.low": ("Forecast", f"B{r_tail}"), "tail_factor.base": ("Forecast", f"C{r_tail}"),
-                        "tail_factor.high": ("Forecast", f"D{r_tail}"), "gateway_growth_decay": ("Forecast", f"C{r_decay}"),
-                        "ent_usage_ratio.low": ("Forecast", f"B{r_ratio}"), "ent_usage_ratio.base": ("Forecast", f"C{r_ratio}"),
-                        "ent_usage_ratio.high": ("Forecast", f"D{r_ratio}"), "ent_growth.low": ("Forecast", f"B{r_eg}"),
-                        "ent_growth.base": ("Forecast", f"C{r_eg}"), "ent_growth.high": ("Forecast", f"D{r_eg}"),
-                        "ent_ramp_days": ("Forecast", f"C{r_ramp}")})
-    for s, v in zip(SCN, (0.93, 0.97, 1.0)):
-        put(FS, f"{SC[s]}{r_tail}", v, BLUE, MULT, YEL if s == "base" else None)
+    # judgment inputs: values live on the Overrides tab (seeded from config); these cells link to them
+    asof_col = CL(2 + T)  # column of the as-of month on Monthly
+    rng_ = {"tail_factor": (0.5, 1.5, MULT), "ent_usage_ratio": (0, 3, PCT), "ent_growth": (-0.5, 1, PCT)}
+    for key, row_, dflt in (("tail_factor", r_tail, (0.93, 0.97, 1.0)), ("ent_usage_ratio", r_ratio, (0.8, 1.0, 1.2)),
+                            ("ent_growth", r_eg, (0.0, 0.03, 0.06))):
+        lo, hi, fmt = rng_[key]
+        for s, v in zip(SCN, dflt):
+            ref = ovr(f"{key}.{s}", f"Forecast: {labels[row_][0]}, {s}", v, fmt, lo, hi)
+            put(FS, f"{SC[s]}{row_}", f"={ref}", GREEN, fmt, YEL if (s == "base" and key != "ent_growth") else None)
     sig = lambda i: f"B{A0 + 1 + i}"  # noqa: E731
-    put(FS, f"B{r_sg}", 0, BLUE, PCT)
+    put(FS, f"B{r_sg}", "=" + ovr("signup_growth.low", "Forecast: new signups monthly growth, low", 0, PCT, -0.5, 1, seeded=False), GREEN, PCT)
     put(FS, f"C{r_sg}", f"=IF(AND({sig(T - 3)}>0,{sig(T)}>0),({sig(T)}/{sig(T - 3)})^(1/3)-1,0)", BLACK, PCT)
     put(FS, f"D{r_sg}", f"=2*C{r_sg}", BLACK, PCT)
     m0r = f"C{A0 + 1 + T - 2}:C{A0 + 1 + T}"
     put(FS, f"B{r_m0}", f"=IF(COUNT({m0r})=0,0,MIN({m0r}))", BLACK, NUM6)
     put(FS, f"C{r_m0}", f"=IF(COUNT({m0r})=0,0,AVERAGE({m0r}))", BLACK, NUM6)
     put(FS, f"D{r_m0}", f"=IF(COUNT({m0r})=0,0,MAX({m0r}))", BLACK, NUM6)
-    put(FS, f"C{r_decay}", 0.5, BLUE, MULT, YEL)
-    for s, v in zip(SCN, (0.8, 1.0, 1.2)):
-        put(FS, f"{SC[s]}{r_ratio}", v, BLUE, PCT, YEL if s == "base" else None)
-    for s, v in zip(SCN, (0.0, 0.03, 0.06)):
-        put(FS, f"{SC[s]}{r_eg}", v, BLUE, PCT)
-    put(FS, f"C{r_ramp}", 60, BLUE, NUM)
-    asof_col = CL(2 + T)  # column of the as-of month on Monthly
-    put(FS, f"C{r_ssp}", f"=IF(Monthly!{asof_col}{tok_rows[1]}=0,0,Monthly!{asof_col}{rev_rows[1]}/Monthly!{asof_col}{tok_rows[1]})", GREEN, USD4)
-    put(FS, f"C{r_gap}", f"=IF(Monthly!{asof_col}{tok_rows[2]}=0,0,Monthly!{asof_col}{rev_rows[2]}/Monthly!{asof_col}{tok_rows[2]})", GREEN, USD4)
+    put(FS, f"C{r_decay}", "=" + ovr("gateway_growth_decay", "Forecast: gateway growth decay (base)", 0.5, MULT, 0, 2), GREEN, MULT, YEL)
+    put(FS, f"C{r_ramp}", "=" + ovr("ent_ramp_days", "Forecast: enterprise ramp length (days)", 60, NUM, 1, 365), GREEN, NUM)
+    ssp_model = f"=IF(Monthly!{asof_col}{tok_rows[1]}=0,0,Monthly!{asof_col}{rev_rows[1]}/Monthly!{asof_col}{tok_rows[1]})"
+    gap_model = f"=IF(Monthly!{asof_col}{tok_rows[2]}=0,0,Monthly!{asof_col}{rev_rows[2]}/Monthly!{asof_col}{tok_rows[2]})"
+    put(FS, f"C{r_ssp}", "=" + ovr("price.self_serve", "Forecast: self-serve net $ per M tokens (price-change test)", ssp_model, USD4, 0, 1, seeded=False), GREEN, USD4)
+    put(FS, f"C{r_gap}", "=" + ovr("price.gateway", "Forecast: gateway net $ per M tokens (price-change test)", gap_model, USD4, 0, 1, seeded=False), GREEN, USD4)
     put(FS, f"C{r_early}", f"=SUMIFS(Data_EarlierCohorts!$B:$B,Data_EarlierCohorts!$A:$A,{ASOF})/{safe_days(ASOF)}/1E9", BLACK, NUM3)
 
     # scenario projections
@@ -610,7 +700,7 @@ def build(path):
     put(FE, "F5", "Close date", BOLD)
     put(FE, "F6", f"=EOMONTH({ASOF},0)", BLACK, DATEF)
     put(FE, "F7", "List price ($/M)", BOLD)
-    put(FE, "F8", f"={P('list_price_per_mtok')}", GREEN, USD4)
+    put(FE, "F8", "=" + ovr("price.list", "Forecast: list $ per M tokens for pipeline deals", f"={P('list_price_per_mtok')}", USD4, 0, 1, seeded=False), GREEN, USD4)
     FI = lambda row, s: f"Forecast!${SC[s]}${row}"  # noqa: E731
     RAMP = f"Forecast!$C${r_ramp}"
     r = 12
@@ -725,25 +815,23 @@ def build(path):
     CP = wb.create_sheet("Capacity")
     title(CP, "From demand forecast to GPUs: reserve the base, rent the peaks", "Inference serving only. Peak and base ratios come from Data_Hourly when hourly data exists; otherwise the override inputs are used.")
     put(CP, "A4", "Inputs", BOLD)
-    header(CP, 5, ["Input", "Value", "Source / why"])
+    header(CP, 5, ["Input", "Value (set on Overrides)", "Source / why"])
     HB = "Data_Hourly!$B$2:$B$169"
-    cin = [("Tokens per second per busy GPU", 20604, NUM, BLUE, "Replace with measured serving throughput. Placeholder from the outside-in model: H100, BF16, 8B params."),
-           ("Target utilization at peak", 0.85, PCT, BLUE, "Headroom for the latency promise and bursts."),
-           ("Reserved rate ($ / GPU-hour)", 2.50, USD2, BLUE, "From your capacity contract."),
-           ("On-demand rate ($ / GPU-hour)", 3.00, USD2, BLUE, "Same provider tier."),
-           ("Peak hour / average (override if no hourly data)", 1.75, MULT, BLUE, "Used only when Data_Hourly is empty."),
-           ("Quietest hour / average (override if no hourly data)", 0.55, MULT, BLUE, "Used only when Data_Hourly is empty."),
-           ("Peak hour / average (used)", f"=IF(COUNT({HB})=0,B10,MAX({HB})/AVERAGE({HB}))", MULT, BLACK, "Last 7 days of the as-of month."),
-           ("Quietest hour / average (used)", f"=IF(COUNT({HB})=0,B11,MIN({HB})/AVERAGE({HB}))", MULT, BLACK, ""),
-           ("Last 7 days: tokens per day (B)", f'=IF(COUNT({HB})=0,"",SUM({HB})/7/1E9)', NUM2, BLACK, "")]
+    cap_in = [("gpu_tokens_per_sec", "Tokens per second per busy GPU", 20604, NUM, 1, 10000000, "Replace with measured serving throughput. Placeholder from the outside-in model: H100, BF16, 8B params."),
+              ("peak_utilization", "Target utilization at peak", 0.85, PCT, 0.05, 1, "Headroom for the latency promise and bursts."),
+              ("reserved_rate", "Reserved rate ($ / GPU-hour)", 2.50, USD2, 0, 100, "From your capacity contract."),
+              ("on_demand_rate", "On-demand rate ($ / GPU-hour)", 3.00, USD2, 0, 100, "Same provider tier."),
+              ("peak_ratio_override", "Peak hour / average (override if no hourly data)", 1.75, MULT, 1, 20, "Used only when Data_Hourly is empty."),
+              ("base_ratio_override", "Quietest hour / average (override if no hourly data)", 0.55, MULT, 0, 1, "Used only when Data_Hourly is empty.")]
+    cin = [(lab, "=" + ovr(f"capacity.{k}", f"Capacity: {lab}", v, fmt, lo, hi), fmt, GREEN, why) for k, lab, v, fmt, lo, hi, why in cap_in]
+    cin += [("Peak hour / average (used)", f"=IF(COUNT({HB})=0,B10,MAX({HB})/AVERAGE({HB}))", MULT, BLACK, "Last 7 days of the as-of month."),
+            ("Quietest hour / average (used)", f"=IF(COUNT({HB})=0,B11,MIN({HB})/AVERAGE({HB}))", MULT, BLACK, ""),
+            ("Last 7 days: tokens per day (B)", f'=IF(COUNT({HB})=0,"",SUM({HB})/7/1E9)', NUM2, BLACK, "")]
     for i, (lab, v, fmt, font, why) in enumerate(cin):
         rr = 6 + i
         put(CP, f"A{rr}", lab)
         put(CP, f"B{rr}", v, font, fmt, YEL if i in (0, 1) else None)
         put(CP, f"C{rr}", why, SUB)
-    for k, rr in (("gpu_tokens_per_sec", 6), ("peak_utilization", 7), ("reserved_rate", 8), ("on_demand_rate", 9),
-                  ("peak_ratio_override", 10), ("base_ratio_override", 11)):
-        INPUT_CELLS[f"capacity.{k}"] = ("Capacity", f"B{rr}")
     TPS, UTIL, RRATE, ORATE, PEAKR, BASER, TPD7 = "$B$6", "$B$7", "$B$8", "$B$9", "$B$12", "$B$13", "$B$14"
     r = 17
     put(CP, f"A{r - 1}", "GPUs needed by month and scenario", BOLD)
@@ -804,6 +892,10 @@ def build(path):
     title(S, "Monthly close", "Formulas only. Start here, then Checks. Every figure traces to a Data_ sheet and from there to a query in /sql.")
     put(S, "A3", "As-of month", BOLD); put(S, "B3", f"={ASOF}", GREEN, MONF)
     put(S, "C3", "Sources", BOLD); put(S, "D3", f"={P('sources_loaded')}", GREEN)
+    put(S, "F3", "Overrides", BOLD); put(S, "G3", "=Overrides!$C$5", GREEN)
+    S.conditional_formatting.add("G3", FormulaRule(
+        formula=[f'AND({OV_SWITCH}="ON",COUNTIF(Overrides!$F${OV_IN0}:$F${OV_INMAX},"Applied")+COUNTIF(Overrides!$H${OV_ADJ0}:$H${OV_ADJ_LAST},"Applied")>0)'],
+        fill=PatternFill("solid", fgColor="F8D7DA")))
     six = [CL(2 + j) for j in range(WINDOW - 6, WINDOW)]
     header(S, 5, ["Metric"] + [f"=Monthly!{c}4" for c in six])
     kpi = [("Billable tokens per day (B)", M_TPD, NUM1), ("Growth in tokens per day", M_GR, PCT), ("Net revenue ($k)", M_REV, NUM1),
@@ -853,7 +945,8 @@ def build(path):
         ("How this workbook works", None),
         ("1. Numbers enter only through the grey Data_ tabs. The runner fills them from your sources; you can also paste query results by hand.", None),
         ("2. Every other tab is formulas reading the Data_ tabs for a 12-month window ending at the as-of month.", None),
-        ("3. Blue cells are judgment inputs (forecast and capacity). The runner seeds them from config.yaml; edit them here to test scenarios.", None),
+        ("3. Judgment inputs (forecast and capacity) live on the Overrides tab, seeded from config.yaml. Type an override in a yellow cell to test a scenario.", None),
+        ("   Bad entries are ignored, not fatal: a word, an error or an out-of-range number falls back to the model value. Set the switch on Overrides to OFF to undo every override at once.", None),
         ("4. Grey-shaded cells on Checks and Summary are for people and the agent: owners, explanations, commentary.", None),
         ("", None),
         ("This close", None),
@@ -864,6 +957,7 @@ def build(path):
         ("Usage data from", f"={P('data_first_date')}"),
         ("Usage data to", f"={P('data_last_date')}"),
         ("Checks flagged", f'=COUNTIF({G},"FLAG")'),
+        ("Overrides", "=Overrides!$C$5"),
         ("", None),
         ("Color key: blue = input, black = formula, green = link to another tab, yellow = key assumption, grey tab = data.", None),
     ]
@@ -876,7 +970,7 @@ def build(path):
     widths(ST, {"A": 40, "B": 30})
 
     order = ["Start", "Summary", "Checks", "Monthly", "UseCases", "Cohorts", "Enterprise", "Concentration",
-             "Forecast", "Forecast_Ent", "Capacity"] + list(DATA_SHEETS)
+             "Forecast", "Forecast_Ent", "Capacity", "Overrides"] + list(DATA_SHEETS)
     wb._sheets = [wb[n] for n in order]
     for ws in wb.worksheets:
         ws.sheet_view.showGridLines = False

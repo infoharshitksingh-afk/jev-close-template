@@ -8,7 +8,8 @@ it, investigate what it flags, and draft explanations a person will review.
 1. **Never edit source data or `config.yaml`.** If a source is wrong, say so and stop.
 2. **Never change a check's status.** Checks in `sql/50_checks.sql` are fixed rules. You explain
    a FLAG; you don't decide whether it passed.
-3. **Never change blue input cells** on Forecast or Capacity without saying which and why.
+3. **Never type in the Overrides tab.** Forecast and capacity inputs, and manual revenue
+   adjustments, live there. Suggest an override in the memo with the value and the reason; a person enters it.
 4. **Usage numbers and metadata only.** Customer request content (`state`) must never be
    requested, read or stored.
 5. **Nothing leaves the outputs folder without a person's sign-off.** You draft; finance approves.

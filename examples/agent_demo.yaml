@@ -39,11 +39,11 @@ events:
           answer: >
             Feb net revenue $247.7k vs $233.3k in Jan (+6.2%). Tokens rose 7.0% (5,648B to 6,040B).
             Enterprise true-ups fell $1.0k as Meridian Legal and others used more of their commitments.
-          evidence: "monthly_summary (sql/30_core.sql); Summary!B8 = Monthly!H33 = SUM of Monthly segment rows, from Data_Monthly"
+          evidence: "monthly_summary (sql/30_core.sql); Summary!B8 = Monthly!H34 = SUM of Monthly segment rows, from Data_Monthly"
       - reply: |
           *Feb net revenue: $247.7k*, up 6.2% from Jan ($233.3k).
           • Tokens up 7.0% (5,648B → 6,040B). Revenue grew a little slower because enterprise true-ups shrank by $1.0k: customers like Meridian Legal used more of what they'd committed to.
-          • Source: `monthly_summary` (sql/30_core.sql). In the workbook it's Summary!B8 → Monthly!H33 → Data_Monthly.
+          • Source: `monthly_summary` (sql/30_core.sql). In the workbook it's Summary!B8 → Monthly!H34 → Data_Monthly.
           [Q-0001]
 
   - react: {as: Maya (FP&A), question: Q-0001, emoji: white_check_mark}
