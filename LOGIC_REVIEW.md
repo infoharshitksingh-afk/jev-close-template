@@ -39,7 +39,8 @@ These are assumptions the code can't verify. Each one has a config setting or a 
 3. **Price history** (`billing.prices`). Mid-month price changes: the invoice-price check
    compares against the month-end price, so a mid-month change can raise a false FLAG.
 4. **Free credit**: grant size, which channels get it, and whether it expires. Expiry
-   (breakage) isn't modelled.
+   (breakage) isn't modelled. Credit a gateway gives its own users (Vercel gives teams $5 a
+   month) is the gateway's cost, not TypeSafe's: never list a gateway in `free_credit_channels`.
 
 **Accounting** (these change reported revenue; confirm with the accountants)
 5. **Revenue = usage in the month.** This fits usage-based billing under ASC 606, but prepaid
@@ -48,8 +49,12 @@ These are assumptions the code can't verify. Each one has a config setting or a 
    list value with an offsetting marketing expense instead.
 7. **Commitments are monthly.** Annual commitments with a year-end true-up are not supported;
    they would be recognized differently.
-8. **Gateways: net or gross** (`gateway_revenue_treatment`). Net treats the gateway as the
-   customer. The right answer depends on each gateway agreement.
+8. **Gateways: net or gross** (`gateway_revenue_treatment`), and the fee. Net treats the gateway
+   as the customer. The right answer depends on each gateway agreement. As of Oct 2026,
+   OpenRouter and Vercel list Jev at the direct price and Vercel says it adds no markup, so the
+   fee may be zero and the gateway may act as an agent passing the price through. The example
+   config starts Vercel, OpenRouter, Netlify and Cloudflare at 0% and leaves DigitalOcean at 8%,
+   unconfirmed. Confirm each agreement before trusting gateway revenue.
 
 **Data**
 9. **Accounts table**: one row per account, with a reliable signup date. The segment column is
@@ -66,11 +71,17 @@ These are assumptions the code can't verify. Each one has a config setting or a 
 13. **Use-case rules** in `sql/20_use_case_rules.sql` were set on synthetic data. Recalibrate them
     against the accuracy table on the UseCases tab before quoting use-case shares.
 14. **Serving throughput** (`capacity.gpu_tokens_per_sec`) is a placeholder from an outside-in
-    model. Engineering should supply measured tokens per second per GPU, per model version.
+    model. Engineering should supply measured tokens per second per GPU, per model version. The
+    GPU rates (`reserved_rate` $3.05, `on_demand_rate` $4.50) are market placeholders as of Oct
+    2026: H100 rental prices rose about 15% over the prior year, and a typical 1-year commitment
+    is about 32% below on-demand. Replace them with contracted rates.
 
 ## Limits of the template
 
 - 12-month window; up to 40 contracts, 40 pipeline deals, 8 channels, 15 use cases, 150 check
   rows. Change the constants in `lib/schema.py` and run `python jevclose.py template` to raise them.
 - One reporting currency (USD).
+- Competition is modelled simply: `competitor_churn` removes a fixed share of self-serve tokens
+  each month (3% in the low case by default), and a price change is tested by overriding the
+  forecast prices on the Overrides tab. Neither changes the enterprise forecast.
 - Inference compute only on the Capacity tab: training, research, networking and staff are excluded.

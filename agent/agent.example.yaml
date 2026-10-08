@@ -66,7 +66,7 @@ areas:
     backup: {name: "", slack_id: ""}
     checks: [8, 9]
     assumptions: [8]
-    keywords: [openrouter, vercel, digitalocean, gateway, statement, remittance, reseller, partner fee]
+    keywords: [openrouter, vercel, digitalocean, netlify, cloudflare, gateway, statement, remittance, reseller, partner fee]
 
   forecast:
     name: Demand forecast
@@ -74,7 +74,7 @@ areas:
     backup: {name: "", slack_id: ""}
     checks: []
     assumptions: [12]
-    keywords: [forecast, cohort, tail factor, scenario, growth, ramp, variance]
+    keywords: [forecast, cohort, tail factor, scenario, growth, ramp, variance, churn, competitor, decisions api, strands]
 
   capacity:
     name: GPU capacity and serving cost

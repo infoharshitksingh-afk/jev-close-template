@@ -35,36 +35,48 @@
   "Overrides",
   "C16"
  ],
- "gateway_growth_decay": [
+ "competitor_churn.low": [
+  "Overrides",
+  "C17"
+ ],
+ "competitor_churn.base": [
   "Overrides",
   "C18"
  ],
- "ent_ramp_days": [
+ "competitor_churn.high": [
   "Overrides",
   "C19"
  ],
+ "gateway_growth_decay": [
+  "Overrides",
+  "C21"
+ ],
+ "ent_ramp_days": [
+  "Overrides",
+  "C22"
+ ],
  "capacity.gpu_tokens_per_sec": [
-  "Overrides",
-  "C23"
- ],
- "capacity.peak_utilization": [
-  "Overrides",
-  "C24"
- ],
- "capacity.reserved_rate": [
-  "Overrides",
-  "C25"
- ],
- "capacity.on_demand_rate": [
   "Overrides",
   "C26"
  ],
- "capacity.peak_ratio_override": [
+ "capacity.peak_utilization": [
   "Overrides",
   "C27"
  ],
- "capacity.base_ratio_override": [
+ "capacity.reserved_rate": [
   "Overrides",
   "C28"
+ ],
+ "capacity.on_demand_rate": [
+  "Overrides",
+  "C29"
+ ],
+ "capacity.peak_ratio_override": [
+  "Overrides",
+  "C30"
+ ],
+ "capacity.base_ratio_override": [
+  "Overrides",
+  "C31"
  ]
 }

@@ -105,7 +105,8 @@ def run(data, inputs, as_of):
         for n in (1, 2, 3):
             tm = add_months(as_of, n)
             ndays = calendar.monthrange(tm.year, tm.month)[1]
-            ss = sum(P[(i, T + n - i)] for i in range(T + n + 1)) + e_last * tail ** n
+            churn = float((inputs.get("competitor_churn") or {}).get(s, 0.0))
+            ss = (sum(P[(i, T + n - i)] for i in range(T + n + 1)) + e_last * tail ** n) * (1 - churn) ** n
             ga = G[T] * (1 + g_or) ** n
             # signed contracts
             ent_tok = ent_rev = 0.0

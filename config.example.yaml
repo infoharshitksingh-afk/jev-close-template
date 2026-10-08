@@ -52,12 +52,19 @@ billing:
     - {effective_from: 2026-09-15, price_per_mtok: 0.042}
   free_credit_usd: 5.0                  # default grant for new accounts (an accounts.free_credit_usd column overrides)
   free_credit_channels: [direct]        # channels whose new accounts get the default grant
+                                        # Never list a gateway here: credit a gateway gives its own users
+                                        # (e.g. Vercel's $5/month) is the gateway's cost, not TypeSafe's.
   prorate_partial_months: true          # prorate commitments in a contract's first and last month
 
 gateways:                               # resellers; channel names must match the usage/accounts data
-  vercel:       {fee_pct: 0.05, passes_customer_ids: true}
-  openrouter:   {fee_pct: 0.05, passes_customer_ids: false}
-  digitalocean: {fee_pct: 0.08, passes_customer_ids: true}
+  # fee_pct = what the gateway deducts from what it pays TypeSafe. Set it from each gateway agreement.
+  # Oct 2026: OpenRouter and Vercel list Jev at the direct price ($0.042/M) and Vercel says it adds no
+  # markup, so 0 is the starting point for both. See LOGIC_REVIEW.md assumption 8.
+  vercel:       {fee_pct: 0.0, passes_customer_ids: true}
+  openrouter:   {fee_pct: 0.0, passes_customer_ids: false}
+  digitalocean: {fee_pct: 0.08, passes_customer_ids: true}    # UNCONFIRMED: check the agreement
+  netlify:      {fee_pct: 0.0, passes_customer_ids: false}    # added Oct 2026; IDs and fee unconfirmed
+  cloudflare:   {fee_pct: 0.0, passes_customer_ids: false}    # added Oct 2026; IDs and fee unconfirmed
 gateway_revenue_treatment: net          # net = gateway is the customer; gross = fee booked as a cost
 
 checks:
@@ -77,12 +84,15 @@ forecast:                               # seeds the blue cells on the Forecast t
   ent_usage_ratio: {low: 0.8, base: 1.0, high: 1.2}
   ent_growth: {low: 0.0, base: 0.03, high: 0.06}
   ent_ramp_days: 60
+  competitor_churn: {low: 0.03, base: 0.0, high: 0.0}   # monthly share of self-serve tokens lost to rival
+                                                        # decision APIs (OpenAI Decisions API, AWS Strands Decider)
 
 capacity:                               # seeds the blue cells on the Capacity tab
   gpu_tokens_per_sec: 20604             # replace with measured serving throughput
   peak_utilization: 0.85
-  reserved_rate: 2.50
-  on_demand_rate: 3.00
+  reserved_rate: 3.05                   # MARKET PLACEHOLDER (Oct 2026): ~32% below on-demand, a typical 1-year deal.
+  on_demand_rate: 4.50                  # MARKET PLACEHOLDER (Oct 2026): H100 at specialist GPU clouds.
+                                        # Replace both with TypeSafe's contracted rates.
   peak_ratio_override: 1.75             # only used when there is no hourly data
   base_ratio_override: 0.55
 

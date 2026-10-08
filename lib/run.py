@@ -147,7 +147,7 @@ def export(con, cfg, grain, status, as_of, include_pipeline=True):
 def forecast_inputs(cfg):
     f = {"tail_factor": {"low": 0.93, "base": 0.97, "high": 1.0}, "gateway_growth_decay": 0.5,
          "ent_usage_ratio": {"low": 0.8, "base": 1.0, "high": 1.2}, "ent_growth": {"low": 0.0, "base": 0.03, "high": 0.06},
-         "ent_ramp_days": 60}
+         "ent_ramp_days": 60, "competitor_churn": {"low": 0.03, "base": 0.0, "high": 0.0}}
     for k, v in (cfg.get("forecast") or {}).items():
         if isinstance(v, dict) and isinstance(f.get(k), dict):
             f[k].update(v)

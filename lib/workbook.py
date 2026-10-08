@@ -477,7 +477,7 @@ def build(path):
     SCN = ("low", "base", "high")
     put(FS, "A4", "Assumptions", BOLD)
     header(FS, 5, ["Input", "Low", "Base", "High", "Why"])
-    r_tail, r_sg, r_m0, r_gw, r_decay, r_ratio, r_eg, r_ramp, r_ssp, r_gap, r_early = range(6, 17)
+    r_tail, r_sg, r_m0, r_gw, r_decay, r_ratio, r_eg, r_ramp, r_ssp, r_gap, r_early, r_churn = range(6, 18)
     labels = {
         r_tail: ("Cohort development factor beyond observed history", "Applies to cohort ages not yet observed, and to the combined older cohorts."),
         r_sg: ("New signups, monthly growth", "Base = average growth over the last 3 months. Low = flat (blue). High = double."),
@@ -490,6 +490,7 @@ def build(path):
         r_ssp: ("Self-serve realized $ per M tokens (latest month)", "Net revenue / billable tokens. Below list price because of free credit and gateway fees."),
         r_gap: ("Gateway (no IDs) realized $ per M tokens (latest month)", ""),
         r_early: ("Older cohorts (before window), tokens/day latest month (B)", "Forecast = this x development factor each month."),
+        r_churn: ("Self-serve tokens lost to competitors, per month", "Rival decision APIs (OpenAI Decisions API, AWS Strands Decider). Compounds monthly."),
     }
     for rr, (lab, why) in labels.items():
         put(FS, f"A{rr}", lab)
@@ -521,9 +522,10 @@ def build(path):
 
     # judgment inputs: values live on the Overrides tab (seeded from config); these cells link to them
     asof_col = CL(2 + T)  # column of the as-of month on Monthly
-    rng_ = {"tail_factor": (0.5, 1.5, MULT), "ent_usage_ratio": (0, 3, PCT), "ent_growth": (-0.5, 1, PCT)}
+    rng_ = {"tail_factor": (0.5, 1.5, MULT), "ent_usage_ratio": (0, 3, PCT), "ent_growth": (-0.5, 1, PCT),
+            "competitor_churn": (0, 0.5, PCT)}
     for key, row_, dflt in (("tail_factor", r_tail, (0.93, 0.97, 1.0)), ("ent_usage_ratio", r_ratio, (0.8, 1.0, 1.2)),
-                            ("ent_growth", r_eg, (0.0, 0.03, 0.06))):
+                            ("ent_growth", r_eg, (0.0, 0.03, 0.06)), ("competitor_churn", r_churn, (0.03, 0.0, 0.0))):
         lo, hi, fmt = rng_[key]
         for s, v in zip(SCN, dflt):
             ref = ovr(f"{key}.{s}", f"Forecast: {labels[row_][0]}, {s}", v, fmt, lo, hi)
@@ -594,7 +596,7 @@ def build(path):
         for n in (1, 2, 3):
             mi = T + n
             cells = ",".join(f"{TC(mi - i)}{hdr + 1 + i}" for i in range(mi + 1))
-            put(FS, f"{CL(1 + n)}{rr}", f"=SUM({cells})+$C${r_early}*${SC[s]}${r_tail}^{n}", BLACK, NUM2)
+            put(FS, f"{CL(1 + n)}{rr}", f"=(SUM({cells})+$C${r_early}*${SC[s]}${r_tail}^{n})*(1-${SC[s]}${r_churn})^{n}", BLACK, NUM2)
             SS[(s, n)] = f"{CL(1 + n)}{rr}"
     row = cal + 5
 
@@ -819,8 +821,8 @@ def build(path):
     HB = "Data_Hourly!$B$2:$B$169"
     cap_in = [("gpu_tokens_per_sec", "Tokens per second per busy GPU", 20604, NUM, 1, 10000000, "Replace with measured serving throughput. Placeholder from the outside-in model: H100, BF16, 8B params."),
               ("peak_utilization", "Target utilization at peak", 0.85, PCT, 0.05, 1, "Headroom for the latency promise and bursts."),
-              ("reserved_rate", "Reserved rate ($ / GPU-hour)", 2.50, USD2, 0, 100, "From your capacity contract."),
-              ("on_demand_rate", "On-demand rate ($ / GPU-hour)", 3.00, USD2, 0, 100, "Same provider tier."),
+              ("reserved_rate", "Reserved rate ($ / GPU-hour)", 3.05, USD2, 0, 100, "Market placeholder (Oct 2026, ~32% below on-demand). Replace with the contracted rate."),
+              ("on_demand_rate", "On-demand rate ($ / GPU-hour)", 4.50, USD2, 0, 100, "Market placeholder (Oct 2026): H100 at specialist GPU clouds. Same provider tier as reserved."),
               ("peak_ratio_override", "Peak hour / average (override if no hourly data)", 1.75, MULT, 1, 20, "Used only when Data_Hourly is empty."),
               ("base_ratio_override", "Quietest hour / average (override if no hourly data)", 0.55, MULT, 0, 1, "Used only when Data_Hourly is empty.")]
     cin = [(lab, "=" + ovr(f"capacity.{k}", f"Capacity: {lab}", v, fmt, lo, hi), fmt, GREEN, why) for k, lab, v, fmt, lo, hi, why in cap_in]

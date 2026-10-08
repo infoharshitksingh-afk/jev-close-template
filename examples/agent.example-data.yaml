@@ -135,6 +135,8 @@ areas:
     - openrouter
     - vercel
     - digitalocean
+    - netlify
+    - cloudflare
     - gateway
     - statement
     - remittance
@@ -159,6 +161,10 @@ areas:
     - growth
     - ramp
     - variance
+    - churn
+    - competitor
+    - decisions api
+    - strands
   capacity:
     name: GPU capacity and serving cost
     owner:
